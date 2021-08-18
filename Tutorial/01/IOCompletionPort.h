@@ -4,43 +4,12 @@
 #include <winsock2.h>
 #include <Ws2tcpip.h>
 
+#include <iostream>
+#include <string>
 #include <thread>
 #include <vector>
 
-#define MAX_SOCKBUF 1024	//패킷 크기
-#define MAX_WORKERTHREAD 4  //쓰레드 풀에 넣을 쓰레드 수
-
-enum class IOOperation
-{
-	RECV,
-	SEND
-};
-
-//WSAOVERLAPPED구조체를 확장 시켜서 필요한 정보를 더 넣었다.
-struct stOverlappedEx
-{
-	WSAOVERLAPPED m_wsaOverlapped;		//Overlapped I/O구조체
-	SOCKET		m_socketClient;			//클라이언트 소켓
-	WSABUF		m_wsaBuf;				//Overlapped I/O작업 버퍼
-	char		m_szBuf[ MAX_SOCKBUF ]; //데이터 버퍼
-	IOOperation m_eOperation;			//작업 동작 종류
-};	
-	
-//클라이언트 정보를 담기위한 구조체
-struct stClientInfo
-{
-	SOCKET			m_socketClient;			//Cliet와 연결되는 소켓
-	stOverlappedEx	m_stRecvOverlappedEx;	//RECV Overlapped I/O작업을 위한 변수
-	stOverlappedEx	m_stSendOverlappedEx;	//SEND Overlapped I/O작업을 위한 변수
-	
-	stClientInfo()
-	{
-		ZeroMemory( &m_stRecvOverlappedEx , sizeof( stOverlappedEx ) );
-		ZeroMemory( &m_stSendOverlappedEx , sizeof( stOverlappedEx ) );
-		m_socketClient = INVALID_SOCKET;
-	}
-};
-
+#include "Define.h"
 
 class IOCompletionPort
 {
@@ -61,20 +30,22 @@ public:
 		int nRet = WSAStartup(MAKEWORD(2, 2), &wsaData);
 		if (0 != nRet)
 		{
-			printf("[에러] WSAStartup()함수 실패 : %d\n", WSAGetLastError());
+			auto errcode = WSAGetLastError();
+			std::cout << "[에러] WSAStartup()함수 실패 : " << errcode << std::endl;
 			return false;
 		}
 
 		//연결지향형 TCP , Overlapped I/O 소켓을 생성
-		mListenSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, NULL, WSA_FLAG_OVERLAPPED);
+		mListenSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, NULL, WSA_FLAG_OVERLAPPED); 
 
 		if (INVALID_SOCKET == mListenSocket)
 		{
-			printf("[에러] socket()함수 실패 : %d\n", WSAGetLastError());
+			auto errcode = WSAGetLastError();
+			std::cout << "[에러] socket()함수 실패 : " << errcode << std::endl;
 			return false;
 		}
 
-		printf("소켓 초기화 성공\n");
+		std::cout << "소켓 초기화 성공" << std::endl;
 		return true;
 	}
 
@@ -155,7 +126,7 @@ public:
 			}
 		}
 		
-		//Accepter 쓰레드를 종요한다.
+		//Accepter 쓰레드를 종료한다.
 		mIsAccepterRun = false;
 		closesocket(mListenSocket);
 		
@@ -219,7 +190,7 @@ private:
 		//socket과 pClientInfo를 CompletionPort객체와 연결시킨다.
 		auto hIOCP = CreateIoCompletionPort((HANDLE)pClientInfo->m_socketClient
 										, mIOCPHandle
-										, (ULONG_PTR)(pClientInfo), 0);
+										, (ULONG_PTR)(pClientInfo)/*key*/, 0);
 		
 		if (NULL == hIOCP || mIOCPHandle != hIOCP)
 		{
