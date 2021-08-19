@@ -142,7 +142,7 @@ private:
 	{
 		for (UINT32 i = 0; i < maxClientCount; ++i)
 		{
-			mClientInfos.emplace_back();
+			mClientInfos.emplace_back(); //참고로 emplace_back은 constructor 호출해줌. 복사 연산도 일어나지 않는다.
 		}
 	}
 
@@ -209,7 +209,7 @@ private:
 		
 		//Overlapped I/O을 위해 각 정보를 셋팅해 준다.
 		pClientInfo->m_stRecvOverlappedEx.m_wsaBuf.len = MAX_SOCKBUF;
-		pClientInfo->m_stRecvOverlappedEx.m_wsaBuf.buf = pClientInfo->m_stRecvOverlappedEx.m_szBuf;
+		pClientInfo->m_stRecvOverlappedEx.m_wsaBuf.buf = pClientInfo->m_recvBuf;
 		pClientInfo->m_stRecvOverlappedEx.m_eOperation = IOOperation::RECV;
 
 		int nRet = WSARecv(pClientInfo->m_socketClient,
@@ -217,7 +217,7 @@ private:
 			1,
 			&dwRecvNumBytes,
 			&dwFlag,
-			(LPWSAOVERLAPPED) & (pClientInfo->m_stRecvOverlappedEx),
+			(LPWSAOVERLAPPED)&(pClientInfo->m_stRecvOverlappedEx),
 			NULL);
 
 		//socket_error이면 client socket이 끊어진걸로 처리한다.
@@ -236,12 +236,12 @@ private:
 		DWORD dwRecvNumBytes = 0;
 
 		//전송될 메세지를 복사
-		CopyMemory(pClientInfo->m_stSendOverlappedEx.m_szBuf, pMsg, nLen);
+		CopyMemory(pClientInfo->m_sendBuf, pMsg, nLen);
 
 
 		//Overlapped I/O을 위해 각 정보를 셋팅해 준다.
 		pClientInfo->m_stSendOverlappedEx.m_wsaBuf.len = nLen;
-		pClientInfo->m_stSendOverlappedEx.m_wsaBuf.buf = pClientInfo->m_stSendOverlappedEx.m_szBuf;
+		pClientInfo->m_stSendOverlappedEx.m_wsaBuf.buf = pClientInfo->m_sendBuf;
 		pClientInfo->m_stSendOverlappedEx.m_eOperation = IOOperation::SEND;
 
 		int nRet = WSASend(pClientInfo->m_socketClient,
@@ -316,17 +316,17 @@ private:
 			//Overlapped I/O Recv작업 결과 뒤 처리
 			if (IOOperation::RECV == pOverlappedEx->m_eOperation)
 			{
-				pOverlappedEx->m_szBuf[dwIoSize] = NULL;
-				printf("[수신] bytes : %d , msg : %s\n", dwIoSize, pOverlappedEx->m_szBuf);
+				pClientInfo->m_recvBuf[dwIoSize] = '\0';
+				printf("[수신] bytes : %d , msg : %s\n", dwIoSize, pClientInfo->m_recvBuf);
 
 				//클라이언트에 메세지를 에코한다.
-				SendMsg(pClientInfo, pOverlappedEx->m_szBuf, dwIoSize);
-				BindRecv(pClientInfo);
+				SendMsg(pClientInfo, pClientInfo->m_recvBuf, dwIoSize);
+				BindRecv(pClientInfo);  //다시 낚시대를 던진다. 
 			}
 			//Overlapped I/O Send작업 결과 뒤 처리
 			else if (IOOperation::SEND == pOverlappedEx->m_eOperation)
 			{
-				printf("[송신] bytes : %d , msg : %s\n", dwIoSize, pOverlappedEx->m_szBuf);
+				printf("[송신] bytes : %d , msg : %s\n", dwIoSize, pClientInfo->m_sendBuf);
 			}
 			//예외 상황
 			else
@@ -366,7 +366,7 @@ private:
 				return;
 			}
 
-			//Recv Overlapped I/O작업을 요청해 놓는다.
+			//Recv Overlapped I/O작업을 요청해 놓는다. 낚시대 던지기
 			bRet = BindRecv(pClientInfo);
 			if (false == bRet)
 			{
