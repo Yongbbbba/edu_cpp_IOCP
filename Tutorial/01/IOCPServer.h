@@ -139,9 +139,9 @@ public:
 	// 지금 프로젝트에서는 에코 서버 부분
 	virtual void OnClose() abstract {}
 	virtual void OnConnect() abstract {}
-	virtual void OnReceive(const UINT32 size_, char* pData_) abstract {}
+	virtual void OnReceive(stClientInfo* pClientInfo, const UINT32 size_, char* pData_) abstract {}
 
-private:
+protected:
 	void CreateClient(const UINT32 maxClientCount)
 	{
 		for (UINT32 i = 0; i < maxClientCount; ++i)
@@ -319,13 +319,13 @@ private:
 			//Overlapped I/O Recv작업 결과 뒤 처리
 			if (IOOperation::RECV == pOverlappedEx->m_eOperation)
 			{
-				OnReceive(dwIoSize, pClientInfo->m_recvBuf);
+				OnReceive(pClientInfo, dwIoSize, pClientInfo->m_recvBuf);
 				//pClientInfo->m_recvBuf[dwIoSize] = '\0';
 				//printf("[수신] bytes : %d , msg : %s\n", dwIoSize, pClientInfo->m_recvBuf);
 
 				//클라이언트에 메세지를 에코한다.
-				SendMsg(pClientInfo, pClientInfo->m_recvBuf, dwIoSize);
-				BindRecv(pClientInfo);  //다시 낚시대를 던진다. 
+				//SendMsg(pClientInfo, pClientInfo->m_recvBuf, dwIoSize);
+				//BindRecv(pClientInfo);  //다시 낚시대를 던진다. 
 			}
 			//Overlapped I/O Send작업 결과 뒤 처리
 			else if (IOOperation::SEND == pOverlappedEx->m_eOperation)
@@ -414,7 +414,7 @@ private:
 	}
 
 
-private:
+protected:
 	//클라이언트 정보 저장 구조체
 	std::vector<stClientInfo> mClientInfos;
 
